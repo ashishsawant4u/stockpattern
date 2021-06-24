@@ -15,6 +15,18 @@ public class StockPrice {
 	private float lowPrice;
 	
 	private float closePrice;
+	
+	private float movingAverage;
+	
+	private boolean hasSupport;
+	
+	private String tradeResult;
+	
+	private boolean entry;
+	
+	private boolean exit;
+	
+	private String orderDetails;
 
 	public String getSymbol() {
 		return symbol;
@@ -63,9 +75,61 @@ public class StockPrice {
 	public void setClosePrice(float closePrice) {
 		this.closePrice = closePrice;
 	}
-	
-	
-	
-	
+
+	public float getMovingAverage() {
+		return movingAverage;
+	}
+
+	public void setMovingAverage(float movingAverage) {
+		this.movingAverage = movingAverage;
+	}
+
+	public boolean isHasSupport() {
+		return hasSupport;
+	}
+
+	public void setHasSupport(boolean hasSupport) {
+		this.hasSupport = hasSupport;
+	}
+
+	public String getTradeResult() {
+		return tradeResult;
+	}
+
+	public void setTradeResult(String tradeResult) {
+		this.tradeResult = tradeResult;
+	}
+
+	public boolean isEntry() {
+		return entry;
+	}
+
+	public void setEntry(boolean entry) {
+		this.entry = entry;
+	}
+
+	public boolean isExit() {
+		return exit;
+	}
+
+	public void setExit(boolean exit) {
+		this.exit = exit;
+	}
+
+	public String getOrderDetails() {
+		return orderDetails;
+	}
+
+	public void setOrderDetails(String orderDetails) {
+		this.orderDetails = orderDetails;
+	}
+
+	@Override
+	public String toString() {
+		return "StockPrice [symbol=" + symbol + ", marketDate=" + marketDate + ", openPrice=" + openPrice
+				+ ", highPrice=" + highPrice + ", lowPrice=" + lowPrice + ", closePrice=" + closePrice
+				+ ", movingAverage=" + movingAverage + ", hasSupport=" + hasSupport + ", tradeResult=" + tradeResult
+				+ ", entry=" + entry + ", exit=" + exit + ", orderDetails=" + orderDetails + "]";
+	}
 	
 }
