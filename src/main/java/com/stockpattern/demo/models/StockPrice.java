@@ -27,6 +27,16 @@ public class StockPrice {
 	private boolean exit;
 	
 	private String orderDetails;
+	
+	private boolean isGreenCandle;
+	
+	private boolean isRedCandle;
+	
+	private boolean isMARising;
+	
+	private float pnlAmount;
+	
+	private float movingAverage200;
 
 	public String getSymbol() {
 		return symbol;
@@ -124,12 +134,56 @@ public class StockPrice {
 		this.orderDetails = orderDetails;
 	}
 
+	public boolean isGreenCandle() {
+		return isGreenCandle;
+	}
+
+	public void setGreenCandle(boolean isGreenCandle) {
+		this.isGreenCandle = isGreenCandle;
+	}
+
+	public boolean isRedCandle() {
+		return isRedCandle;
+	}
+
+	public void setRedCandle(boolean isRedCandle) {
+		this.isRedCandle = isRedCandle;
+	}
+
+	public boolean isMARising() {
+		return isMARising;
+	}
+
+	public void setMARising(boolean isMARising) {
+		this.isMARising = isMARising;
+	}
+
+	public float getPnlAmount() {
+		return pnlAmount;
+	}
+
+	public void setPnlAmount(float pnlAmount) {
+		this.pnlAmount = pnlAmount;
+	}
+
+	public float getMovingAverage200() {
+		return movingAverage200;
+	}
+
+	public void setMovingAverage200(float movingAverage200) {
+		this.movingAverage200 = movingAverage200;
+	}
+
 	@Override
 	public String toString() {
 		return "StockPrice [symbol=" + symbol + ", marketDate=" + marketDate + ", openPrice=" + openPrice
 				+ ", highPrice=" + highPrice + ", lowPrice=" + lowPrice + ", closePrice=" + closePrice
 				+ ", movingAverage=" + movingAverage + ", hasSupport=" + hasSupport + ", tradeResult=" + tradeResult
-				+ ", entry=" + entry + ", exit=" + exit + ", orderDetails=" + orderDetails + "]";
+				+ ", entry=" + entry + ", exit=" + exit + ", orderDetails=" + orderDetails + ", isGreenCandle="
+				+ isGreenCandle + ", isRedCandle=" + isRedCandle + ", isMARising=" + isMARising + ", pnlAmount="
+				+ pnlAmount + ", movingAverage200=" + movingAverage200 + "]";
 	}
+
+	
 	
 }

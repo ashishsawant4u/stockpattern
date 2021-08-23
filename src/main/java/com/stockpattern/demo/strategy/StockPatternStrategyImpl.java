@@ -1,140 +1,178 @@
 package com.stockpattern.demo.strategy;
 
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import javax.annotation.Resource;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.stockpattern.demo.dao.StockPatternDao;
 import com.stockpattern.demo.indicators.Indicators;
+import com.stockpattern.demo.indicators.StockConstants;
+import com.stockpattern.demo.indicators.Utils;
 import com.stockpattern.demo.models.StockPrice;
 
 @Component("stockPatternStrategy")
 public class StockPatternStrategyImpl implements StockPatternStrategy {
+	
+	Logger logger = LoggerFactory.getLogger(StockPatternStrategyImpl.class);
 
-	@Resource(name = "stockPatternDao")
-	StockPatternDao stockPatternDao;
+	int stopLossCount = 0;
+	
+	int targetExitCount = 0;
+	
+	float totalStopLoss = 0.0F;
+	
+	float totalTargetExit = 0.0F;
+	
+
 	
 	@Override
-	public List<StockPrice> getMovingAverage(Date fromDate,int averageScale) {
+	public List<StockPrice> backTestMovingAverage(String symbol,Date fromDate,int averageScale) {
 		
-		List<StockPrice>  stockPriceList = stockPatternDao.findByDayInterval(fromDate, averageScale);
+		//Finding SMA
+		//List<StockPrice>  stockPriceWithMA = prepareMovingAverage(fromDate, averageScale);
+		List<StockPrice>  stockPriceWithMA = prepareMovingAverageByInstrument(symbol, fromDate, averageScale);
 		
-		List<Float> closePriceList = stockPriceList.stream().map(stock->stock.getClosePrice()).collect(Collectors.toList());
+		//Finding Support
+		stockPriceWithMA.stream().forEach(candle -> candle.setHasSupport(Indicators.hasSupport(candle, StockConstants.SUPPORT_PRICE_DIFFERENCE)));
 		
-		Indicators.getMovingAverage(closePriceList, averageScale);
+		//Finding Candle Type RED/GREEN
+		stockPriceWithMA.stream().forEach(candle -> candle.setGreenCandle(Indicators.isGreenCandleWithGoodBody(candle)));
 		
-		return stockPriceList;
+		//Utils.prepareEntryCandles(stockPriceWithMA);
+		
+		//Consolidating green candles with support
+		List<StockPrice>  stockPriceGreenAndSupportWithMA = stockPriceWithMA.stream().filter(candle-> candle.isGreenCandle() && candle.isHasSupport()).collect(Collectors.toList());
+		
+		//Finding green candle with rising MA and support
+		stockPriceGreenAndSupportWithMA.forEach(candle->{
+			candle.setMARising(Utils.isRisinngMAForCandle(candle, stockPriceWithMA, StockConstants.RISING_PRICE_MIN_SCALE));
+							});
+		
+		//Consolidating green candles with support and MA Rising
+		List<StockPrice>  stockPriceGreenAndSupportWithMARising = stockPriceGreenAndSupportWithMA.stream().filter(candle->candle.isMARising()).collect(Collectors.toList());
+		
+		
+		//Marking Entry
+		stockPriceGreenAndSupportWithMARising.forEach(candle->Utils.setBuyEntry(candle));
+		
+		stockPriceGreenAndSupportWithMARising.forEach(candle->Utils.setExit(candle, stockPriceWithMA));
+		
+		//stockPriceGreenAndSupportWithMARising.forEach(candle->logger.info(candle.toString()));
+		
+		//Find Entry
+			//checkBuyEntry(stockPriceWithMA);
+		
+		//checkBuyEntryWhenPriceBelowMA(stockPriceWithMA);
+		
+			//checkProfitAndLoss(symbol);
+		
+		return stockPriceGreenAndSupportWithMARising;
 	}
 	
-	@Override
-	public List<StockPrice> backTestMovingAverage(Date fromDate,int averageScale) {
+
+	private void checkProfitAndLoss(String instrument) 
+	{
+		System.out.println("=============================================================================================================");
+		System.out.println("STOP LOSS COUNT "+stopLossCount+" TARGET EXIT COUNT "+targetExitCount);
+		System.out.println("TOTAL STOP LOSS AMOUNT "+totalStopLoss+" TOTAL TARGET EXIT AMOUNT "+totalTargetExit);
+		System.out.println("TOTAL P/L "+ (totalTargetExit-totalStopLoss));
+		System.out.println("=============================================================================================================");
+	
+		String str = instrument+"|"+stopLossCount+"|"+targetExitCount
+		        + "|"+totalStopLoss+"|"+totalTargetExit
+		        + "|"+ (totalTargetExit-totalStopLoss);
 		
-		List<StockPrice>  stockPriceWithMA = new ArrayList<StockPrice>();
+		logger.info(str);
+		 
+		 stopLossCount = 0;
+			
+	     targetExitCount = 0;
+			
+		 totalStopLoss = 0.0F;
+			
+		totalTargetExit = 0.0F;
 		
-		while(fromDate.compareTo(new Date()) < 0)
+	}
+
+	private void checkBuyEntry(List<StockPrice> stockPriceWithMA) 
+	{
+		for(int i=0;i<stockPriceWithMA.size();i++)
 		{
+			List<Float> highPriceList = stockPriceWithMA.subList(0, i).stream().map(stock->stock.getHighPrice()).collect(Collectors.toList());
+			List<Float> maList = stockPriceWithMA.subList(0, i).stream().map(stock->stock.getMovingAverage()).collect(Collectors.toList());
 			
-			List<StockPrice>  stockPriceList = stockPatternDao.findByDayInterval(fromDate, averageScale);
+			StockPrice candle = stockPriceWithMA.get(i);
 			
-			List<Float> closePriceList = stockPriceList.stream().map(stock->stock.getClosePrice()).collect(Collectors.toList());
-			
-			float movingAvg = Indicators.getMovingAverage(closePriceList, averageScale);
-			
-			//for(StockPrice dayCadle : stockPriceList)
-			for(int i=0;i<stockPriceList.size();i++)
-			{
-				StockPrice dayCadle = stockPriceList.get(i);
-				
-				if(dayCadle.getMarketDate().compareTo(fromDate) == 0)
+			//if(candle.isHasSupport() && Indicators.isGreenCandle(candle) && Indicators.isGreenCandleWithGoodBody(candle) && Indicators.isRising(maList, StockConstants.RISING_PRICE_MIN_SCALE))
+			if(Indicators.isGreenCandle(candle) &&  candle.isHasSupport() && Indicators.isBullish(highPriceList,maList, StockConstants.RISING_PRICE_MIN_SCALE) && Indicators.isGreenCandleWithGoodBody(candle))
+			{	
+				candle.setEntry(true);
+				float buyPrice = candle.getHighPrice()+1;
+				float stopLoss = candle.getLowPrice()-1;
+				float targetPrice = buyPrice+((buyPrice-stopLoss)*2);
+				candle.setOrderDetails("BUY : "+buyPrice+" STOPLOSS : "+stopLoss+" TARGET "+targetPrice);
+				System.out.println("ENTRY CANDLE >> "+candle);
+				StockPrice exitCandle = checkBuyExit(candle,stockPriceWithMA.subList(i+1, stockPriceWithMA.size()));
+				if(null!=exitCandle)
 				{
-					dayCadle.setMovingAverage(movingAvg);
+					candle.setTradeResult(exitCandle.getTradeResult());
+					System.out.println("EXIT  >> "+exitCandle.getTradeResult());
 					
-					if(movingAvg < dayCadle.getLowPrice() && (dayCadle.getLowPrice()-dayCadle.getMovingAverage())<=2)
-					{
-						dayCadle.setHasSupport(true);
-					}
+					String tradeLog = new SimpleDateFormat("dd-MMM-yyyy").format(candle.getMarketDate())+"|"+candle.getSymbol()
+									  +"| BUY | "+buyPrice+"|STOPLOSS | "+stopLoss+"|TARGET | "+targetPrice
+									  +"| EXIT | "+exitCandle.getTradeResult();
 					
-					if(stockPriceWithMA.size()>=1)
-					{
-						StockPrice previousDayCandle = stockPriceWithMA.get(stockPriceWithMA.size()-1);
-						if(previousDayCandle.isHasSupport())
-						{
-							System.out.println("SUPPORT CANDLE >> "+previousDayCandle);
-							boolean isGreenCandle = dayCadle.getClosePrice()>dayCadle.getOpenPrice();
-							if(isGreenCandle)
-							{
-								dayCadle.setEntry(true);
-								float buyPrice = dayCadle.getHighPrice()+1;
-								float stopLoss = dayCadle.getLowPrice()-1;
-								float targetPrice = buyPrice+((buyPrice-stopLoss)*2);
-								dayCadle.setOrderDetails("BUY : "+buyPrice+" STOPLOSS : "+stopLoss+" TARGET "+targetPrice);
-								System.out.println("ENTRY CANDLE >> "+dayCadle);
-								StockPrice exitPrice = getExit(dayCadle);
-								if(null!=exitPrice)
-								{
-									dayCadle.setTradeResult(exitPrice.getTradeResult());
-									System.out.println("EXIT CANDLE >> "+exitPrice);
-								}
-							}
-						}
-					}
-					
-					stockPriceWithMA.add(dayCadle);
+					//logger.info(tradeLog);
 				}
 			}
-			
-			final Calendar calendar = Calendar.getInstance();
-			calendar.setTime(fromDate);
-			calendar.add(Calendar.DAY_OF_YEAR, 1);
-			fromDate = calendar.getTime();
-			
 		}
-		
-		return stockPriceWithMA;
-		
 	}
 	
-	private StockPrice getExit(StockPrice entry)
+	private List<StockPrice> prepareMovingAverageByInstrument(String instrument,Date fromDate, int averageScale) 
+	{	
+		List<StockPrice>  stockPriceListData = Utils.getCandlesData(instrument,fromDate);
+		
+		List<StockPrice>  stockPriceWithMA = Utils.getCandlesDataForGivenScale(stockPriceListData, averageScale);
+	
+		return stockPriceWithMA;
+	}
+	
+	
+	private StockPrice checkBuyExit(StockPrice entryCandle,List<StockPrice> candlesAfterEntry)
 	{
-		final Calendar calendar = Calendar.getInstance();
-		calendar.setTime(entry.getMarketDate());
-		calendar.add(Calendar.DAY_OF_YEAR, 1);
+		List<StockPrice>  stockPriceList = candlesAfterEntry;
 		
-		List<StockPrice>  stockPriceList = stockPatternDao.getDayCandlesAfter(calendar.getTime());
-		
-		float buyPrice = entry.getHighPrice()+1;
-		float stopLossPrice = entry.getLowPrice()-1;
+		float buyPrice = entryCandle.getHighPrice()+1;
+		float stopLossPrice = entryCandle.getLowPrice()-1;
 		float targetPrice = buyPrice+((buyPrice-stopLossPrice)*2);
-		StockPrice exitPrice = null;
 		
-		for(StockPrice dayCandle : stockPriceList)
+		
+		for(StockPrice candle : stockPriceList)
 		{
-			if(dayCandle.getLowPrice() <= targetPrice && targetPrice <=dayCandle.getHighPrice())
+			if(candle.getLowPrice() <= targetPrice && targetPrice <=candle.getHighPrice())
 			{
-				dayCandle.setExit(true);
-				dayCandle.setTradeResult("TARGET_EXIT ON "+new SimpleDateFormat("dd-MMM-yyyy").format(dayCandle.getMarketDate()));
-				exitPrice =  dayCandle;
+				entryCandle.setExit(true);
+				entryCandle.setTradeResult("TARGET_EXIT ON "+new SimpleDateFormat("dd-MMM-yyyy").format(candle.getMarketDate())+"|P/L|"+ (targetPrice-buyPrice));
+				targetExitCount++;
+				totalTargetExit =  totalTargetExit + (targetPrice-buyPrice);
 				break;
 			}
-			if(dayCandle.getLowPrice() <= stopLossPrice && stopLossPrice <=dayCandle.getHighPrice())
+			if(candle.getLowPrice() <= stopLossPrice && stopLossPrice <=candle.getHighPrice())
 			{
-				dayCandle.setExit(true);
-				dayCandle.setTradeResult("STOP_LOSS ON "+new SimpleDateFormat("dd-MMM-yyyy").format(dayCandle.getMarketDate()));
-				exitPrice =  dayCandle;
+				entryCandle.setExit(true);
+				entryCandle.setTradeResult("STOP_LOSS ON "+new SimpleDateFormat("dd-MMM-yyyy").format(candle.getMarketDate())+"|P/L|-"+ (buyPrice-stopLossPrice));
+				stopLossCount++;
+				totalStopLoss =  totalStopLoss + (buyPrice-stopLossPrice);
 				break;
 			}
 			
 		}
 		
-		return exitPrice;
+		return entryCandle;
 	}
 	
 
